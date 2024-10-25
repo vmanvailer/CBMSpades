@@ -7,50 +7,62 @@ projectPath <- "C:/Users/vmanvail/OneDrive - NRCan RNCan/Documents/^GitHub Proje
 
 # Check if directory already exists, otherwise create new directory.
 if(!dir.exists(projectPath)){
-dir.create(projectPath, recursive = TRUE, showWarnings = FALSE)
+  message(paste0("Directory does not exist yet. Creating a new one on: ", projectPath,
+          "\n and setting as working directory."))
+  dir.create(projectPath, recursive = TRUE, showWarnings = FALSE)
+  setwd(projectPath)
+} else {
+  message(paste0("A directory already exists for this project.\n",
+                 projectPath, "\nSetting it as working directory"))
+  setwd(projectPath)
 }
 
-setwd(projectPath)
 
 ## (Optional) Setup python version and virtual environment location ------------
 
 ### Check for compatible python version and install if needed ------------------
 # Currently we are trying with 3.12
-pyVerSimp <- "312"
-pyVerDot <- "3.12"
-pyPath <- grep(pyVerSimp, py_discover_config()$python_versions, value = TRUE)
+# pyVerSimp <- "312"
+# pyVerDot <- "3.12"
+# pyPath <- grep(pyVerSimp, py_discover_config()$python_versions, value = TRUE)
+# if(length(pyPath) != 1){ # If no paths are returned install compatible version.
+#
+#   message("No compatible version of python found.\nInstalling latest version of Python ", pyVerDot)
+#   pyVerIns <- paste0(pyVerDot, ":latest")
+#   install_python(version = pyVer,
+#                  force = FALSE)
+# } else {message(paste0("Found a compatible python ", pyInst$version,
+#                        " version installed. Proceeding with it."))}
 
-if(length(pyPath) != 1){ # If no paths are returned install compatible version.
 
-  message("No compatible version of python found.\nInstalling latest version of Python ", pyVerDot)
-  pyVerIns <- paste0(pyVerDot, ":latest")
-  install_python(version = pyVerIns,
-                 force = FALSE)
-}
+library(reticulate)
+source("check_python_version.R")
+pyInst <- find_compatible_python()
+pyVerSimp <- gsub(pattern = "\\.", replacement = "", pyInst$version)
 
 ### Check for existing virtual environment and create if needed ----------------
-PyEnvName <- paste0("/PyEnv", pyVerSimp, "_CBMSPADES")
+PyEnvName <- paste0("PyEnv", pyVerSimp, "_CBMSPADES")
 EnvDirs <- list.dirs(path.expand("~/.virtualenvs"), recursive = FALSE)
 
 pyEnvPath <- grep(PyEnvName, EnvDirs, value = TRUE)
 
 # Does it exists? If not create.
 if (!reticulate::virtualenv_exists(pyEnvPath)){
-  message(paste0("Creating new python environment ", PyEnvName, " on ", path.expand(virtualenv_root())))
-  pyEnvPath <- paste0(path.expand("~/.virtualenvs"), PyEnvName)
-  virtualenv_create(envname = pyEnv,
-                    python = paste0("<=", pyVerDot))
+  message(paste0("Creating new python environment ", basename(pyEnvPath), " on: \n", path.expand(virtualenv_root())))
+  pyEnvPath <- file.path(path.expand("~/.virtualenvs"), basename(pyEnvPath))
+  virtualenv_create(envname = basename(pyEnvPath),
+                    python = pyInst$version)
 } else {
   # If it does exist does the folder name version match environment version?
   # If not prompt user to recreate env or continue as is.
   message(paste0("Python virtual environment already exists: \n", pyEnvPath, "\nChecking environment version"))
   checkEnvVer <- py_discover_config(use_environment = pyEnvPath)$version
-  if(checkEnvVer != pyVerDot) {
+  if(checkEnvVer != stringr::str_extract(pattern = ".{4}", pyInst$version)) {
     message("Virtual environment version does not match folder version name.")
     recEnv = readline(prompt = "Would you like to [1] recreate this environment (recommended) or [2] proceed as is? Type 1 or 2: ")
     if(recEnv == 1) {
-      virtualenv_create(envname = pyEnv,
-                        python = paste0("<=", pyVerDot),
+      virtualenv_create(envname = basename(pyEnvPath),
+                        python = pyInst$version,
                         force = TRUE)
     } else if(recEnv == 2) {
       message("Leaving conflicting environment as is.")
