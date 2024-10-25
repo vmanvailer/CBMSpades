@@ -12,8 +12,50 @@ dir.create(projectPath, recursive = TRUE, showWarnings = FALSE)
 
 setwd(projectPath)
 
-## (Optional) Setup python virtual environment location-------------------------
-# venvPath <- "C:/Users/vmanvail/.virtualenvs/PyEnv_CBMSPADES" # substitute on ret argument of setupProject()
+## (Optional) Setup python version and virtual environment location ------------
+
+### Check for compatible python version and install if needed ------------------
+# Currently we are trying with 3.12
+pyVerSimp <- "312"
+pyVerDot <- "3.12"
+pyPath <- grep(pyVerSimp, py_discover_config()$python_versions, value = TRUE)
+
+if(length(pyPath) != 1){ # If no paths are returned install compatible version.
+
+  message("No compatible version of python found.\nInstalling latest version of Python ", pyVerDot)
+  pyVerIns <- paste0(pyVerDot, ":latest")
+  install_python(version = pyVerIns,
+                 force = FALSE)
+}
+
+### Check for existing virtual environment and create if needed ----------------
+PyEnvName <- paste0("/PyEnv", pyVerSimp, "_CBMSPADES")
+EnvDirs <- list.dirs(path.expand("~/.virtualenvs"), recursive = FALSE)
+
+pyEnvPath <- grep(PyEnvName, EnvDirs, value = TRUE)
+
+if (!reticulate::virtualenv_exists(pyEnvPath)){
+
+  message(paste0("Creating new python environment ", PyEnvName, " on ", path.expand(virtualenv_root())))
+
+  pyEnvPath <- paste0(path.expand("~/.virtualenvs"), PyEnvName)
+  virtualenv_create(envname = pyEnv,
+                    python = paste0("<=", pyVerDot))
+
+} else {message("Python virtual environment ", pyEnvPath, " already exists.")}
+
+py_versions_windows()
+py_discover_config(use_environment = "C:/Users/vmanvail/OneDrive - NRCan RNCan/Documents/.virtualenvs/PyEnv312_CBMSPADES")
+py_version()
+py_config()
+
+use_python()
+use_python_version()
+use_virtualenv()
+
+reticulate::py_versions_windows()[["install_path"]][2]
+
+venvPath <- "C:/Users/vmanvail/.virtualenvs/PyEnv312_CBMSPADES" # substitute on ret argument of setupProject()
 
 ## Install SPADES from Github repo ---------------------------------------------
 repos <- unique(c("predictiveecology.r-universe.dev", getOption("repos")))
@@ -56,12 +98,12 @@ out <- SpaDES.project::setupProject(
   #     .useCache = c(".inputObjects", "init")
   #     )),
   ret = {
-    reticulate::use_virtualenv(virtualenv = "r-reticulate")
-    reticulate::py_install("libcbm", envname = "r-reticulate")
+    reticulate::use_virtualenv(virtualenv = venvPath)
+    reticulate::py_install("libcbm", envname = basename(venvPath))
   },
-  
+
   #### begin manually passed inputs ##########################################
-  
+
   spatialDT = {
     dt <- readRDS(file.path(inputScott, "spatialDT.rds"))
     ##Transition: getting rid of the double gcids columns and naming one column
@@ -70,14 +112,14 @@ out <- SpaDES.project::setupProject(
     dt[, growth_curve_id := NULL]
     dt
   },
-  
-  
+
+
   delays = rep(0, length(unique(spatialDT$pixelGroup))),
-  
+
   userDist = data.table(distName = c("wildfire", "clearcut", "deforestation", "20% mortality", "20% mortality"),
                         rasterID = c(1L, 2L, 4L, 3L, 5L),
                         wholeStand = c(1L, 1L, 1L, 0L, 0L)),
-  
+
   ##Need to keep this master raster here. It defines the smaller study area. We
   ##will not need it when we run all of the managed forests of SK as the study
   ##area will be defined by a masterRaster that we get via a URL.
@@ -141,16 +183,16 @@ out <- SpaDES.project::setupProject(
     rasts <- reproducible::postProcessTo(rasts, cropTo = masterRaster, projectTo = masterRaster,
                                          maskTo = masterRaster, method = "near")
   },
-  
+
   # Restart = getOption("SpaDES.project.Restart", FALSE),
-  
+
   outputs = as.data.frame(expand.grid(objectName = c("cbmPools", "NPP"),
                                       saveTime = sort(c(times$start,
                                                         times$start +
                                                           c(1:(times$end - times$start))
                                       )))),
   updateRprofile = TRUE# ,
-  
+
 )
 out$modules <- out$modules[grep("spadesCBM", invert = TRUE, out$modules)] # remove spadesCBM as it is not a true module
 out$loadOrder <- unlist(out$modules)
