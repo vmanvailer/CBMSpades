@@ -34,28 +34,34 @@ EnvDirs <- list.dirs(path.expand("~/.virtualenvs"), recursive = FALSE)
 
 pyEnvPath <- grep(PyEnvName, EnvDirs, value = TRUE)
 
+# Does it exists? If not create.
 if (!reticulate::virtualenv_exists(pyEnvPath)){
-
   message(paste0("Creating new python environment ", PyEnvName, " on ", path.expand(virtualenv_root())))
-
   pyEnvPath <- paste0(path.expand("~/.virtualenvs"), PyEnvName)
   virtualenv_create(envname = pyEnv,
                     python = paste0("<=", pyVerDot))
+} else {
+  # If it does exist does the folder name version match environment version?
+  # If not prompt user to recreate env or continue as is.
+  message(paste0("Python virtual environment already exists: \n", pyEnvPath, "\nChecking environment version"))
+  checkEnvVer <- py_discover_config(use_environment = pyEnvPath)$version
+  if(checkEnvVer != pyVerDot) {
+    message("Virtual environment version does not match folder version name.")
+    recEnv = readline(prompt = "Would you like to [1] recreate this environment (recommended) or [2] proceed as is? Type 1 or 2: ")
+    if(recEnv == 1) {
+      virtualenv_create(envname = pyEnv,
+                        python = paste0("<=", pyVerDot),
+                        force = TRUE)
+    } else if(recEnv == 2) {
+      message("Leaving conflicting environment as is.")
+    } else {
+      errorCondition("Invalid selection.")
+    }
+  } else {
+    message("Folder and environment versions match, proceeding.")
+    }
 
-} else {message("Python virtual environment ", pyEnvPath, " already exists.")}
-
-py_versions_windows()
-py_discover_config(use_environment = "C:/Users/vmanvail/OneDrive - NRCan RNCan/Documents/.virtualenvs/PyEnv312_CBMSPADES")
-py_version()
-py_config()
-
-use_python()
-use_python_version()
-use_virtualenv()
-
-reticulate::py_versions_windows()[["install_path"]][2]
-
-venvPath <- "C:/Users/vmanvail/.virtualenvs/PyEnv312_CBMSPADES" # substitute on ret argument of setupProject()
+}
 
 ## Install SPADES from Github repo ---------------------------------------------
 repos <- unique(c("predictiveecology.r-universe.dev", getOption("repos")))
@@ -98,8 +104,8 @@ out <- SpaDES.project::setupProject(
   #     .useCache = c(".inputObjects", "init")
   #     )),
   ret = {
-    reticulate::use_virtualenv(virtualenv = venvPath)
-    reticulate::py_install("libcbm", envname = basename(venvPath))
+    reticulate::use_virtualenv(virtualenv = pyEnvPath)
+    reticulate::py_install("libcbm", envname = basename(pyEnvPath))
   },
 
   #### begin manually passed inputs ##########################################
